@@ -20,9 +20,7 @@ Welcome to **Innovation Hub**—our collaborative workspace where we transform i
 ├── Ideathons/
 ├── Competitions/
 ├── Research/
-├── Prototypes/
-├── Documentation/
-└── Assets/
+
 ```
 
 ## 🛠️ Technologies
