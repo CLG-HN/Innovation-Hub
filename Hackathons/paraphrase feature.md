@@ -1,297 +1,634 @@
-# AI Paraphraser Architecture (Three-Candidate Pipeline)
+# Production-Grade AI Paraphraser Architecture (Token Optimized)
 
-## Overview
+## Design Goals
 
-The system generates **three high-quality paraphrase candidates**, evaluates them using multiple quality metrics, ranks them, and returns the best result. This architecture is model-agnostic, allowing any LLM API to be integrated.
+* Minimize LLM token usage
+* Maximize paraphrase quality
+* Preserve original meaning
+* Keep response time low
+* Support any LLM (Gemini, GPT, Claude, Qwen, Llama, etc.)
+* Modular and scalable architecture
 
-```
+---
+
+# Overall Architecture
+
+```text
                     Browser Extension
                            │
                            ▼
-                  Text Extraction Layer
-                           │
-                           ▼
-                Input Cleaning & Validation
-                           │
-                           ▼
-                 Language Detection
-                           │
-                           ▼
-                Prompt Construction Engine
-                           │
-                           ▼
-                LLM (Gemini / GPT / Claude / Qwen)
-                           │
-             ┌─────────────┼─────────────┐
-             ▼             ▼             ▼
-       Candidate 1    Candidate 2    Candidate 3
-             │             │             │
-             └─────────────┼─────────────┘
-                           ▼
-                Quality Evaluation Engine
-                           │
-         ┌─────────────────┼─────────────────┐
-         ▼                 ▼                 ▼
-   Semantic Score   Grammar Score   Readability Score
-         │                 │                 │
-         ├─────────────────┼─────────────────┤
-         ▼                 ▼                 ▼
- Style Consistency   Fluency Check   Redundancy Check
-         │                 │                 │
-         ├─────────────────┼─────────────────┤
-         ▼                 ▼                 ▼
-    Vocabulary Score   Length Balance   Confidence Score
-                           │
-                           ▼
-                Weighted Ranking Algorithm
-                           │
-                           ▼
-                Best Candidate Selection
-                           │
-                           ▼
-                Final Formatting & Output
-                           │
-                           ▼
-                    Browser Extension
+──────────────────────────────────────────────────────────────
+                 PREPROCESSING LAYER (0 LLM Tokens)
+──────────────────────────────────────────────────────────────
+
+Text Extraction
+        │
+        ▼
+Input Cleaning & Validation
+        │
+        ▼
+Language Detection
+        │
+        ▼
+Formatting Parser
+        │
+        ▼
+Named Entity Recognition (NER)
+        │
+        ▼
+Protected Token Masking
+(Persons, Dates, URLs, Emails,
+Numbers, Citations, Technical Terms)
+        │
+        ▼
+Prompt Builder
+        │
+        ▼
+
+──────────────────────────────────────────────────────────────
+                   LLM GENERATION LAYER
+──────────────────────────────────────────────────────────────
+
+Single LLM Request
+Generate exactly 3 diverse paraphrases
+
+        │
+        ▼
+
+Candidate 1
+Candidate 2
+Candidate 3
+
+        │
+        ▼
+
+──────────────────────────────────────────────────────────────
+                 POST PROCESSING LAYER
+──────────────────────────────────────────────────────────────
+
+Restore Protected Tokens
+        │
+        ▼
+Semantic Similarity
+        │
+        ▼
+Grammar Checker
+        │
+        ▼
+Readability Analyzer
+        │
+        ▼
+Duplicate Detection
+        │
+        ▼
+Style Verification
+        │
+        ▼
+Length Balance
+        │
+        ▼
+Ranking Engine
+        │
+        ▼
+Best Candidate
+        │
+        ▼
+Cache
+        │
+        ▼
+Browser Extension
 ```
 
 ---
 
-# Processing Pipeline
+# Layer 1 — Text Extraction
 
-### Step 1 — Input Validation
+### Purpose
 
-* Remove unnecessary whitespace.
-* Normalize punctuation.
-* Detect unsupported or empty input.
-* Preserve formatting where possible.
+Extract selected text from:
 
----
+* Web pages
+* Google Docs
+* PDF viewers (where supported)
+* Textareas
+* Input fields
 
-### Step 2 — Language Detection
+Output:
 
-Automatically identify the input language.
-
-Benefits:
-
-* Correct prompt generation.
-* Future multilingual support.
+```
+Raw User Text
+```
 
 ---
 
-### Step 3 — Prompt Builder
+# Layer 2 — Input Cleaning
 
-Construct prompts based on the selected paraphrasing mode.
+### Responsibilities
 
-Examples:
+* Remove extra whitespace
+* Normalize quotation marks
+* Normalize punctuation
+* Fix line breaks
+* Remove invisible Unicode characters
+* Detect empty input
 
-* Standard
-* Fluent
-* Formal
-* Academic
-* Simple
-* Creative
-* Concise
-* Expand
+No LLM required.
 
 ---
 
-### Step 4 — Candidate Generation
+# Layer 3 — Language Detection
 
-Generate exactly **three distinct paraphrases**.
+Instead of asking the LLM:
 
-Each candidate should:
+> "What language is this?"
 
-* Preserve meaning.
-* Use different sentence structures.
-* Avoid repetition.
-* Sound natural.
+Use:
 
----
+* franc
+* cld3
+* lingua
 
-# Quality Evaluation Engine
+Output
 
-Each candidate is evaluated independently.
+```
+English
+Spanish
+French
+Hindi
+...
+```
 
-## 1. Semantic Similarity
+Used for selecting prompts.
 
-Checks whether the original meaning is preserved.
+Cost:
 
-Weight: **35%**
-
----
-
-## 2. Grammar & Spelling
-
-Detects grammatical and spelling errors.
-
-Weight: **20%**
+**0 Tokens**
 
 ---
 
-## 3. Readability
+# Layer 4 — Formatting Parser
 
-Measures how easy the text is to understand.
+Parse
 
-Weight: **10%**
+* Markdown
+* HTML
+* Lists
+* Tables
+* Headers
+* Bold
+* Italics
 
----
+Example
 
-## 4. Fluency
+Input
 
-Evaluates whether the sentence sounds natural.
+```
+- Apple
+- Banana
+```
 
-Weight: **10%**
+Only
 
----
+```
+Apple
+Banana
+```
 
-## 5. Style Consistency
+is paraphrased.
 
-Ensures the tone remains consistent with the selected mode.
-
-Weight: **10%**
-
----
-
-## 6. Vocabulary Enhancement
-
-Rewards appropriate synonym usage without changing meaning.
-
-Weight: **5%**
-
----
-
-## 7. Redundancy Detection
-
-Penalizes unnecessary repetition.
-
-Weight: **5%**
+Formatting is restored later.
 
 ---
 
-## 8. Length Balance
+# Layer 5 — Named Entity Recognition (NER)
 
-Prevents outputs that are excessively short or long.
+Detect
 
-Weight: **5%**
+* Person names
+* Companies
+* Locations
+* Organizations
+* Products
+* Dates
+* Times
+
+Example
+
+```
+John Smith works at OpenAI.
+```
+
+becomes
+
+```
+<PERSON_1> works at <ORG_1>.
+```
+
+Benefits
+
+* Prevents hallucinations
+* Keeps names unchanged
+* Reduces prompt size
 
 ---
 
-# Ranking Formula
+# Layer 6 — Protected Token Masking
+
+Mask everything that should never change.
+
+Protect
+
+* URLs
+* Emails
+* Phone numbers
+* Dates
+* Currency
+* Measurements
+* Citations
+* References
+* DOIs
+* Technical terms
+* Programming keywords
+* API names
+* Model names
+
+Example
+
+```
+https://github.com
+```
+
+↓
+
+```
+<URL_1>
+```
+
+Later restored automatically.
+
+---
+
+# Layer 7 — Prompt Builder
+
+Construct a compact prompt.
+
+Instead of
+
+```
+Don't modify URLs.
+Don't modify citations.
+Don't modify names.
+Don't modify dates.
+...
+```
+
+Use
+
+```
+Protected placeholders must remain unchanged.
+Generate exactly 3 diverse paraphrases.
+Preserve meaning.
+```
+
+Much fewer tokens.
+
+---
+
+# Layer 8 — Single LLM Request
+
+Instead of
+
+```
+API Call 1
+API Call 2
+API Call 3
+```
+
+Make
+
+ONE request.
+
+Example
+
+```
+Generate exactly three diverse paraphrases.
+Return valid JSON.
+
+{
+ "candidate1":"",
+ "candidate2":"",
+ "candidate3":""
+}
+```
+
+Benefits
+
+* Lower latency
+* Lower API cost
+* Better consistency
+
+---
+
+# Layer 9 — Restore Protected Tokens
+
+Convert
+
+```
+<PERSON_1>
+```
+
+back into
+
+```
+John Smith
+```
+
+Same for
+
+* URLs
+* Emails
+* Citations
+* Dates
+* Numbers
+
+---
+
+# Layer 10 — Quality Evaluation Engine
+
+No LLM required.
+
+Everything runs locally.
+
+---
+
+## Feature 1 — Semantic Similarity
+
+Purpose
+
+Ensure meaning is preserved.
+
+Use
+
+Embedding models
+
+Examples
+
+* all-MiniLM-L6-v2
+* BGE Small
+* E5 Small
+
+Method
+
+Cosine Similarity
+
+---
+
+## Feature 2 — Grammar Checker
+
+Use
+
+* LanguageTool
+* GECToR
+* Gramformer
+
+Checks
+
+* Grammar
+* Spelling
+* Agreement
+* Punctuation
+
+---
+
+## Feature 3 — Readability
+
+Use formulas
+
+* Flesch Reading Ease
+* Flesch Kincaid
+* Gunning Fog
+
+No AI required.
+
+---
+
+## Feature 4 — Duplicate Detection
+
+Reject nearly identical candidates.
+
+Methods
+
+* Cosine similarity
+* Levenshtein Distance
+* Jaccard Similarity
+
+---
+
+## Feature 5 — Style Verification
+
+Verify
+
+Academic
+
+Formal
+
+Creative
+
+Simple
+
+Professional
+
+Business
+
+Matches selected mode.
+
+---
+
+## Feature 6 — Length Balance
+
+Reject outputs
+
+Too short
+
+Too long
+
+Too verbose
+
+Too compressed
+
+---
+
+# Layer 11 — Ranking Engine
+
+Score every candidate.
+
+Example weights
+
+Semantic Similarity
+
+35%
+
+Grammar
+
+20%
+
+Readability
+
+10%
+
+Style
+
+10%
+
+Duplicate Penalty
+
+10%
+
+Vocabulary Diversity
+
+10%
+
+Length Balance
+
+5%
+
+Final formula
 
 ```
 Final Score =
-0.35 × Semantic Similarity +
-0.20 × Grammar +
-0.10 × Readability +
-0.10 × Fluency +
-0.10 × Style +
-0.05 × Vocabulary +
-0.05 × Redundancy +
-0.05 × Length Balance
+0.35 Semantic +
+0.20 Grammar +
+0.10 Readability +
+0.10 Style +
+0.10 Diversity +
+0.10 Duplicate Penalty +
+0.05 Length
 ```
 
-The highest-scoring candidate is selected.
+Highest score wins.
 
 ---
 
-# Advanced Quality Features
+# Layer 12 — Cache
 
-## Intelligent Prompt Routing
+Hash
 
-Use different prompt templates based on:
+```
+SHA256(Input Text)
+```
 
-* Sentence length
-* Paragraph length
-* Writing style
-* User-selected mode
+If already paraphrased
 
----
+↓
 
-## Named Entity Preservation
+Return cached output.
 
-Ensure names, organizations, dates, locations, numbers, citations, and technical terms remain unchanged unless explicitly requested.
+No LLM call.
 
----
-
-## Technical Terminology Protection
-
-Avoid replacing domain-specific words such as programming terms, medical terminology, legal language, or scientific concepts with incorrect synonyms.
+Huge savings.
 
 ---
 
-## Tone Preservation
+# Twelve Token Optimization Features
 
-Maintain the original tone (professional, academic, casual, persuasive, etc.) unless the user requests a different style.
+### 1.
 
----
+Local Language Detection
 
-## Acronym Preservation
-
-Keep abbreviations such as AI, HTTP, GPU, CPU, NASA, and API intact.
+No LLM tokens.
 
 ---
 
-## Citation Protection
+### 2.
 
-Do not modify:
+Local Grammar Checking
 
-* Citations
-* References
-* URLs
-* DOIs
-* Inline citation formats
+No LLM tokens.
 
 ---
 
-## Formatting Preservation
+### 3.
 
-Retain:
+Embedding-Based Semantic Similarity
 
-* Bullet lists
-* Numbered lists
-* Line breaks
-* Markdown
-* HTML formatting (if applicable)
+No LLM tokens.
 
 ---
 
-## Duplicate Detection
+### 4.
 
-Reject candidates that are nearly identical to each other and keep only genuinely different rewrites.
+Formula-Based Readability
 
----
-
-## Confidence Score
-
-Compute an overall confidence score from the evaluation metrics. If all candidates score below a threshold, automatically request a new set of three paraphrases from the LLM.
+No LLM tokens.
 
 ---
 
-## Safety Filters
+### 5.
 
-Prevent:
+Embedding-Based Duplicate Detection
 
-* Hallucinated facts
-* Changed numerical values
-* Altered dates
-* Incorrect units
-* Distorted quotations
-* Offensive or unsafe rewrites
+No LLM tokens.
 
 ---
 
-## Caching
+### 6.
 
-Cache paraphrased results for identical inputs to reduce API usage and improve response time.
+Named Entity Masking
+
+Smaller prompts.
+
+Better accuracy.
 
 ---
 
-## User Modes
+### 7.
 
-Provide multiple rewrite styles:
+Citation Protection
 
-* Academic
-* Concise
-* Expand
-* Humanize
+Avoid unnecessary instructions.
+
+---
+
+### 8.
+
+Technical Term Masking
+
+Prevent incorrect synonym replacement.
+
+---
+
+### 9.
+
+Formatting Preservation
+
+Only paraphrase actual text.
+
+---
+
+### 10.
+
+Compact Prompt Engineering
+
+Short prompts.
+
+Lower token usage.
+
+---
+
+### 11.
+
+Single API Call
+
+Generate all three candidates in one request.
+
+---
+
+### 12.
+
+Caching
+
+Avoid repeated API calls.
+
+---
+
+#
